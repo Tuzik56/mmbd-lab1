@@ -41,7 +41,11 @@ select -1, 'UNKNOWN', 'Неизвестный клиент', null, null, null,
 -- суррогатный ключ product_sk + колонки account_id, client_id,
 -- product_code, product_name + строка «неизвестный продукт» с ключом -1.
 create or replace table marts.dim_product as
-select
+select row_number() over (order by account_id) as product_sk,
+       account_id,
+       client_id,
+       product_code,
+       product_name
     -- TODO: суррогатный ключ product_sk (row_number по account_id)
     -- TODO: account_id, client_id, product_code, product_name
 from staging.accounts
@@ -57,11 +61,14 @@ create or replace table marts.dim_merchant as
 select
     row_number() over (order by m.merchant_id)        as merchant_sk,
     m.merchant_id, m.merchant_name,
+    coalesce(mc.category, 'Неизвестно')               as category,
     -- TODO: категория трат из staging.mcc (join по mcc);
     --       если MCC в справочнике нет — 'Неизвестно' (coalesce)
     m.channel
 from staging.merchants m
 -- TODO: left join staging.mcc ...
+left join staging.mcc as mc
+    on mc.mcc = m.mcc
 union all select -1, 'UNKNOWN', 'Неизвестный мерчант', 'Неизвестно', null
 union all select -2, 'ATM',     'Снятие наличных',     'Наличные',  'atm'
 union all select -3, 'P2P',     'Перевод СБП',         'Переводы',  'p2p';
@@ -78,7 +85,9 @@ select
     t.txn_ts,
     -- TODO: client_sk — из dc, но если join не нашёл клиента,
     --       операция должна попасть на «неизвестного» (ключ -1, coalesce)
+    coalesce(dc.client_sk, -1) as client_sk,
     -- TODO: product_sk — так же
+    coalesce(dp.product_sk, -1) as product_sk,
     case t.channel when 'atm' then -2
                    when 'p2p' then -3
                    else coalesce(dm.merchant_sk, -1) end as merchant_sk,

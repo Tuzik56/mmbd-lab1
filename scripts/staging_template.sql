@@ -68,7 +68,7 @@ qualify row_number() over (partition by client_id order by updated_at desc) = 1;
 -- ----------------------------------------------------------------------------
 create or replace view staging.accounts as
 select account_id, client_id, product_code, product_name,
-       opened_at,   -- TODO: тип date
+       opened_at::date as opened_at,   -- TODO: тип date
        status
 from read_csv('data/abs/accounts.csv', delim=';', all_varchar=true);
 
@@ -77,7 +77,7 @@ from read_csv('data/abs/accounts.csv', delim=';', all_varchar=true);
 -- ----------------------------------------------------------------------------
 create or replace view staging.cards as
 select card_id, account_id, payment_system,
-       issued_at,   -- TODO: тип date
+       issued_at::date as issued_at,   -- TODO: тип date
        status
 from read_csv('data/abs/cards.csv', delim=';', all_varchar=true);
 
@@ -90,7 +90,7 @@ from read_csv('data/abs/cards.csv', delim=';', all_varchar=true);
 create or replace view staging.transactions as
 select * from read_parquet('data/processing/transactions_*.parquet')
 -- TODO: дедупликация по txn_id
-;
+qualify row_number() over (partition by txn_id order by txn_ts desc) = 1;
 
 -- ----------------------------------------------------------------------------
 -- ОБРАЗЕЦ 2. Курсы ЦБ: json → «длинная» таблица (дата, валюта, курс).
